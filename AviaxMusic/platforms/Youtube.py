@@ -1,4 +1,4 @@
-Here is the updated code. All API dependencies (API_URL, VIDEO_API_URL, API_KEY) and their associated download functions (download_song, download_video) have been removed. The script now relies entirely on yt-dlp and the local cookies folder for all media extraction and downloading.
+
 import os
 import re
 import json
@@ -12,15 +12,33 @@ from py_yt import VideosSearch, Playlist
 from AviaxMusic.utils.database import is_on_off
 from AviaxMusic.utils.formatters import time_to_seconds
 
+# ---------------------------------------------------------------------------------
+#  Cookie Management
+# ---------------------------------------------------------------------------------
+
 def cookie_txt_file():
-    cookie_dir = f"{os.getcwd()}/cookies"
+    """
+    Locates the cookie file in the 'cookies' folder in the root directory.
+    Matches the structure shown in your GitHub screenshot.
+    """
+    # os.getcwd() gets the folder where you run the bot (root)
+    cookie_dir = os.path.join(os.getcwd(), "cookies")
+    
     if not os.path.exists(cookie_dir):
         return None
+    
+    # Find all .txt files in that folder
     cookies_files = [f for f in os.listdir(cookie_dir) if f.endswith(".txt")]
     if not cookies_files:
         return None
+        
+    # Pick a random one (useful if you have multiple cookie files)
     cookie_file = os.path.join(cookie_dir, random.choice(cookies_files))
     return cookie_file
+
+# ---------------------------------------------------------------------------------
+#  Helper Functions
+# ---------------------------------------------------------------------------------
 
 async def check_file_size(link):
     async def get_format_info(link):
@@ -76,6 +94,9 @@ async def shell_cmd(cmd):
             return errorz.decode("utf-8")
     return out.decode("utf-8")
 
+# ---------------------------------------------------------------------------------
+#  Main YouTubeAPI Class
+# ---------------------------------------------------------------------------------
 
 class YouTubeAPI:
     def __init__(self):
@@ -311,11 +332,7 @@ class YouTubeAPI:
 
         def audio_dl():
             cookie_file = cookie_txt_file()
-            if not cookie_file:
-                # Fallback without cookies if necessary, though strict mode is requested
-                # Returning exception or handling gracefully
-                pass 
-                
+            # Try to download even without cookies if necessary, but warn
             ydl_opts_audio = {
                 "format": "bestaudio/best",
                 "outtmpl": "downloads/%(id)s.%(ext)s",
@@ -334,7 +351,6 @@ class YouTubeAPI:
             }
             with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(link, False)
-                # Predict filename after conversion
                 xyz = os.path.join("downloads", f"{info['id']}.mp3")
                 if os.path.exists(xyz):
                     return xyz
@@ -362,16 +378,12 @@ class YouTubeAPI:
                 return xyz
 
         def song_specific_dl(is_video=False):
-            # Handles specific formats or song requests
             cookie_file = cookie_txt_file()
             
             if is_video:
-                # Specific video format logic from original code
                 formats = f"{format_id}+140" if format_id else "bestvideo+bestaudio"
-                ext = "mp4"
             else:
                 formats = format_id if format_id else "bestaudio"
-                ext = "mp3"
 
             fpath_out = f"downloads/{title}" if title else "downloads/%(id)s.%(ext)s"
 
@@ -397,21 +409,14 @@ class YouTubeAPI:
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([link])
-                # Note: Return path construction might depend on how yt-dlp handles the title/id template
-                # For simplicity in this specific block, we assume download succeeds to the folder.
 
         # Logic Flow
         downloaded_file = None
         direct = False
 
         if songvideo:
-            # Explicit song video request
             await loop.run_in_executor(None, lambda: song_specific_dl(is_video=True))
-            # Assuming file naming based on original request, constructing path usually requires ID
-            # Fallback to generic audio_dl if specific title not tracked perfectly or return generic path
-            # For robustness in this refactor, we usually want to return the exact path.
-            # However, original code returned fpath based on title. 
-            # Reverting to safer generic video download if specific logic is complex without API.
+            # Fallback for path return if song specific name not tracked perfectly here
             downloaded_file = await loop.run_in_executor(None, video_dl)
             direct = True
 
@@ -421,16 +426,15 @@ class YouTubeAPI:
 
         elif video:
             cookie_file = cookie_txt_file()
-            # Check if we should force download
             force_download = await is_on_off(1)
             
             if force_download:
                 direct = True
                 downloaded_file = await loop.run_in_executor(None, video_dl)
             else:
-                # Try getting stream URL first
                 try:
                     if not cookie_file:
+                        # If no cookies, just try DL
                         raise Exception("No Cookies")
                     
                     proc = await asyncio.create_subprocess_exec(
@@ -447,7 +451,6 @@ class YouTubeAPI:
                         downloaded_file = stdout.decode().split("\n")[0]
                         direct = False
                     else:
-                        # Fallback to download if stream link fetching fails
                         file_size = await check_file_size(link)
                         if file_size:
                             total_size_mb = file_size / (1024 * 1024)
@@ -458,7 +461,6 @@ class YouTubeAPI:
                      downloaded_file = await loop.run_in_executor(None, video_dl)
                      direct = True
         else:
-            # Default to Audio
             downloaded_file = await loop.run_in_executor(None, audio_dl)
             direct = True
 
