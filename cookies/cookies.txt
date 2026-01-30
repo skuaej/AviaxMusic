@@ -1,9 +1,5 @@
 
 
-# Netscape HTTP Cookie File
-# https://curl.haxx.se/rfc/cookie_spec.html
-# This is a generated file! Do not edit.
-
 .youtube.com	TRUE	/	TRUE	1769435093	GPS	1
 .youtube.com	TRUE	/	TRUE	1785255183	VISITOR_INFO1_LIVE	QrBzFvxwJ9c
 .youtube.com	TRUE	/	TRUE	1785255183	VISITOR_PRIVACY_METADATA	CgJJThIEGgAgYQ%3D%3D
@@ -33,3 +29,4 @@
 .youtube.com	TRUE	/	FALSE	1769703201	ST-1cueyc4	csn=O-upjgGz8XobZofQ&itct=CDwQ_FoiEwiO1qmRkrGSAxUPgNYIHalKFYsyBmctaGlnaFoPRkV3aGF0X3RvX3dhdGNomgEGEI4eGIAKygEE_XMxuQ%3D%3D
 .youtube.com	TRUE	/	FALSE	1769703201	ST-1gwq1u8	csn=O-upjgGz8XobZofQ&itct=CDMQh_YEGAEiEwiO1qmRkrGSAxUPgNYIHalKFYtaD0ZFd2hhdF90b193YXRjaJoBBQgkEI4eygEE_XMxuQ%3D%3D
 .youtube.com	TRUE	/	FALSE	1769703202	ST-1t0vswp	csn=O-upjgGz8XobZofQ&itct=CAoQ_FoiEwiO1qmRkrGSAxUPgNYIHalKFYsyCmctaGlnaC1yZWNaD0ZFd2hhdF90b193YXRjaJoBBhCOHhieAcoBBP1zMbk%3D
+
