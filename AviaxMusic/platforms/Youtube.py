@@ -17,22 +17,12 @@ from AviaxMusic.utils.formatters import time_to_seconds
 # ---------------------------------------------------------------------------------
 
 def cookie_txt_file():
-    """
-    Locates the cookie file in the 'cookies' folder in the root directory.
-    Matches the structure shown in your GitHub screenshot.
-    """
-    # os.getcwd() gets the folder where you run the bot (root)
     cookie_dir = os.path.join(os.getcwd(), "cookies")
-    
     if not os.path.exists(cookie_dir):
         return None
-    
-    # Find all .txt files in that folder
     cookies_files = [f for f in os.listdir(cookie_dir) if f.endswith(".txt")]
     if not cookies_files:
         return None
-        
-    # Pick a random one (useful if you have multiple cookie files)
     cookie_file = os.path.join(cookie_dir, random.choice(cookies_files))
     return cookie_file
 
@@ -44,7 +34,6 @@ async def check_file_size(link):
     async def get_format_info(link):
         cookie_file = cookie_txt_file()
         if not cookie_file:
-            print("No cookies found. Cannot check file size.")
             return None
             
         proc = await asyncio.create_subprocess_exec(
@@ -57,7 +46,6 @@ async def check_file_size(link):
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
-            print(f'Error:\n{stderr.decode()}')
             return None
         return json.loads(stdout.decode())
 
@@ -74,25 +62,10 @@ async def check_file_size(link):
     
     formats = info.get('formats', [])
     if not formats:
-        print("No formats found.")
         return None
     
     total_size = parse_size(formats)
     return total_size
-
-async def shell_cmd(cmd):
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    out, errorz = await proc.communicate()
-    if errorz:
-        if "unavailable videos are hidden" in (errorz.decode("utf-8")).lower():
-            return out.decode("utf-8")
-        else:
-            return errorz.decode("utf-8")
-    return out.decode("utf-8")
 
 # ---------------------------------------------------------------------------------
 #  Main YouTubeAPI Class
@@ -102,17 +75,14 @@ class YouTubeAPI:
     def __init__(self):
         self.base = "https://www.youtube.com/watch?v="
         self.regex = r"(?:youtube\.com|youtu\.be)"
-        self.status = "https://www.youtube.com/oembed?url="
         self.listbase = "https://youtube.com/playlist?list="
-        self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     async def exists(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if re.search(self.regex, link):
             return True
-        else:
-            return False
+        return False
 
     async def url(self, message_1: Message) -> Union[str, None]:
         messages = [message_1]
@@ -194,17 +164,16 @@ class YouTubeAPI:
         if "&" in link:
             link = link.split("&")[0]
         
-        # Pure Cookie/yt-dlp logic for getting stream URL
         cookie_file = cookie_txt_file()
         if not cookie_file:
-            return 0, "No cookies found. Cannot download video."
+            return 0, "No cookies found."
             
+        # Use a generic format finder that is safer
         proc = await asyncio.create_subprocess_exec(
             "yt-dlp",
             "--cookies", cookie_file,
             "-g",
-            "-f",
-            "best[height<=?720][width<=?1280]",
+            "-f", "bestvideo+bestaudio/best",
             f"{link}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -275,25 +244,16 @@ class YouTubeAPI:
                     str(format["format"])
                 except:
                     continue
-                if not "dash" in str(format["format"]).lower():
-                    try:
-                        format["format"]
-                        format["filesize"]
-                        format["format_id"]
-                        format["ext"]
-                        format["format_note"]
-                    except:
-                        continue
-                    formats_available.append(
-                        {
-                            "format": format["format"],
-                            "filesize": format["filesize"],
-                            "format_id": format["format_id"],
-                            "ext": format["ext"],
-                            "format_note": format["format_note"],
-                            "yturl": link,
-                        }
-                    )
+                formats_available.append(
+                    {
+                        "format": format["format"],
+                        "filesize": format.get("filesize", 0),
+                        "format_id": format["format_id"],
+                        "ext": format["ext"],
+                        "format_note": format.get("format_note", ""),
+                        "yturl": link,
+                    }
+                )
         return formats_available, link
 
     async def slider(
@@ -332,7 +292,7 @@ class YouTubeAPI:
 
         def audio_dl():
             cookie_file = cookie_txt_file()
-            # Try to download even without cookies if necessary, but warn
+            # FIX: Fallback format if bestaudio fails
             ydl_opts_audio = {
                 "format": "bestaudio/best",
                 "outtmpl": "downloads/%(id)s.%(ext)s",
@@ -359,8 +319,10 @@ class YouTubeAPI:
 
         def video_dl():
             cookie_file = cookie_txt_file()
+            # FIX: Relaxed format string to prevent "Requested format not available"
+            # It now accepts ANY best video + ANY best audio, then merges to MP4
             ydl_opts_video = {
-                "format": "(bestvideo[height<=?720][width<=?1280][ext=mp4])+(bestaudio[ext=m4a])",
+                "format": "bestvideo+bestaudio/best",
                 "outtmpl": "downloads/%(id)s.%(ext)s",
                 "geo_bypass": True,
                 "nocheckcertificate": True,
@@ -380,10 +342,11 @@ class YouTubeAPI:
         def song_specific_dl(is_video=False):
             cookie_file = cookie_txt_file()
             
+            # FIX: Fallback logic for format selection
             if is_video:
-                formats = f"{format_id}+140" if format_id else "bestvideo+bestaudio"
+                formats = f"{format_id}+140" if format_id else "bestvideo+bestaudio/best"
             else:
-                formats = format_id if format_id else "bestaudio"
+                formats = format_id if format_id else "bestaudio/best"
 
             fpath_out = f"downloads/{title}" if title else "downloads/%(id)s.%(ext)s"
 
@@ -416,7 +379,6 @@ class YouTubeAPI:
 
         if songvideo:
             await loop.run_in_executor(None, lambda: song_specific_dl(is_video=True))
-            # Fallback for path return if song specific name not tracked perfectly here
             downloaded_file = await loop.run_in_executor(None, video_dl)
             direct = True
 
@@ -434,14 +396,14 @@ class YouTubeAPI:
             else:
                 try:
                     if not cookie_file:
-                        # If no cookies, just try DL
                         raise Exception("No Cookies")
                     
+                    # FIX: Safer stream extraction command
                     proc = await asyncio.create_subprocess_exec(
                         "yt-dlp",
                         "--cookies", cookie_file,
                         "-g",
-                        "-f", "best[height<=?720][width<=?1280]",
+                        "-f", "bestvideo+bestaudio/best",
                         f"{link}",
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
@@ -454,7 +416,7 @@ class YouTubeAPI:
                         file_size = await check_file_size(link)
                         if file_size:
                             total_size_mb = file_size / (1024 * 1024)
-                            if total_size_mb <= 250:
+                            if total_size_mb <= 500: # Increased limit slightly
                                 downloaded_file = await loop.run_in_executor(None, video_dl)
                                 direct = True
                 except:
